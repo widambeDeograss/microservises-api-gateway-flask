@@ -5,7 +5,6 @@ import time
 import logging
 from typing import Dict, Any
 
-
 class ServiceRegistry:
     def __init__(self, host: str = None, port: int = None):
         """

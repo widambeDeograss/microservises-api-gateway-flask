@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+
   etcd:
     image: bitnami/etcd:latest
     environment:
@@ -19,29 +20,55 @@ services:
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
-      - USER_SERVICE_HOST=user-service
-      - USER_SERVICE_PORT=8001
-      - LOAN_SERVICE_HOST=loan-service
-      - LOAN_SERVICE_PORT=8002
+      - USERS_SERVICE_HOST=users
+      - USERS_SERVICE_PORT=5000
+      - MOVIES_SERVICE_HOST=movies
+      - MOVIES_SERVICE_PORT=5001
+      - SHOWTIMES_SERVICE_HOST=showtimes
+      - SHOWTIMES_SERVICE_PORT=5002
+      - BOOKINGS_SERVICE_HOST=bookings
+      - BOOKINGS_SERVICE_PORT=5003
     depends_on:
       - etcd
-      - user-service
-      - loan-service
+      - users
+      - movies
+      - showtimes
+      - bookings
 
-  user-service:
-    build: ./user-service
+  users:
+    build: ./users
     ports:
-      - "8001:8001"
+      - "5000:5000"
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379
     depends_on:
       - etcd
 
-  loan-service:
-    build: ./loan-service
+  movies:
+    build: ./movies
     ports:
-      - "8002:8002"
+      - "5001:5000"
+    environment:
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    depends_on:
+      - etcd
+
+  showtimes:
+    build: ./showtime
+    ports:
+      - "5002:5000"
+    environment:
+      - ETCD_HOST=etcd
+      - ETCD_PORT=2379
+    depends_on:
+      - etcd
+
+  bookings:
+    build: ./bookings
+    ports:
+      - "5003:5000"
     environment:
       - ETCD_HOST=etcd
       - ETCD_PORT=2379

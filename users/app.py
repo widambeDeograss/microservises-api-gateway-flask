@@ -1,15 +1,30 @@
-from users import root_dir, nice_json
 from flask import Flask
 from werkzeug.exceptions import NotFound, ServiceUnavailable
-import json
 import requests
+import os
+import json
+from flask import make_response
 
+
+def root_dir():
+    """Returns the root directory for this service."""
+    return os.path.dirname(os.path.abspath(__file__))
+
+def nice_json(arg):
+    response = make_response(json.dumps(arg, sort_keys=True, indent=4))
+    response.headers['Content-type'] = "application/json"
+    return response
 
 app = Flask(__name__)
 
-with open("{}/database/users.json".format(root_dir()), "r") as f:
-    users = json.load(f)
+# Update the JSON file path
+json_file_path = os.path.join(root_dir(), "database/users.json")
 
+try:
+    with open(json_file_path, "r") as f:
+        users_data = json.load(f)
+except FileNotFoundError:
+    print(f"Error: {json_file_path} does not exist.")
 
 @app.route("/", methods=['GET'])
 def hello():

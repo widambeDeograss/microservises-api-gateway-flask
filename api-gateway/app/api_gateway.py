@@ -2,24 +2,25 @@ import os
 import logging
 import requests
 from flask import Flask, request, jsonify
-from service_registry import ServiceRegistry
+from .service_registry import ServiceRegistry
+
 
 app = Flask(__name__)
-service_registry = ServiceRegistry()
+registry = ServiceRegistry()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-def route_request(service_name):
+def route_request(service_name, path):
     """
     Route request to an available service instance
     :param service_name: Name of the target service
+    :param path: Request path
     :return: Response from the service
     """
     # Discover available service instances
-    services = service_registry.discover_service(service_name)
+    services = registry.discover_service(service_name)
 
     if not services:
         logger.warning(f"No services available for {service_name}")
@@ -38,7 +39,7 @@ def route_request(service_name):
             service_url = f"http://{service_info['host']}:{service_info['port']}"
 
             # Preserve the original request path
-            stripped_path = request.path.split(f"/{service_name}/")[-1] if f"/{service_name}/" in request.path else ""
+            stripped_path = path if f"/{service_name}/" in request.path else request.path.split(f"/{service_name}/")[-1]
             target_url = f"{service_url}/{stripped_path}".rstrip('/')
 
             logger.info(f"Routing request to: {target_url}")
@@ -72,23 +73,30 @@ def route_request(service_name):
         "available_services": list(services.keys())
     }), 503
 
-
-@app.route('/user-service/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
-@app.route('/user-service/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/users/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/users/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 def user_service(path):
-    return route_request('user-service')
+    return route_request('users', path)
 
+@app.route('/movies/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/movies/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+def movie_service(path):
+    return route_request('movies', path)
 
-@app.route('/loan-service/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
-@app.route('/loan-service/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
-def loan_service(path):
-    return route_request('loan-service')
+@app.route('/showtimes/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/showtimes/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+def showtime_service(path):
+    return route_request('showtimes', path)
 
+@app.route('/bookings/', defaults={'path': ''}, methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+@app.route('/bookings/<path:path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+def booking_service(path):
+    return route_request('bookings', path)
 
 @app.route('/register', methods=['POST'])
 def register_service():
     service_data = request.json
-    service_registry.register_service(
+    registry.register_service(
         service_name=service_data['name'],
         host=service_data['host'],
         port=service_data['port'],
@@ -96,25 +104,33 @@ def register_service():
     )
     return jsonify({"status": "Service registered successfully"}), 201
 
-
 @app.route('/unregister', methods=['POST'])
 def unregister_service():
     service_data = request.json
-    service_registry.deregister_service(service_data['name'], service_data['host'], service_data['port'])
+    registry.deregister_service(service_data['name'], service_data['host'], service_data['port'])
     return jsonify({"status": "Service unregistered successfully"}), 200
-
 
 if __name__ == '__main__':
     # Register services on startup
-    service_registry.register_service(
-        'user-service',
+    registry.register_service(
+        'users',
         os.getenv('USER_SERVICE_HOST', 'localhost'),
-        int(os.getenv('USER_SERVICE_PORT', 8001))
+        int(os.getenv('USER_SERVICE_PORT', 5000))
     )
-    service_registry.register_service(
-        'loan-service',
-        os.getenv('LOAN_SERVICE_HOST', 'localhost'),
-        int(os.getenv('LOAN_SERVICE_PORT', 8002))
+    registry.register_service(
+        'movies',
+        os.getenv('MOVIES_SERVICE_HOST', 'localhost'),
+        int(os.getenv('MOVIES_SERVICE_PORT', 5001))
+    )
+    registry.register_service(
+        'showtimes',
+        os.getenv('SHOWTIMES_SERVICE_HOST', 'localhost'),
+        int(os.getenv('SHOWTIMES_SERVICE_PORT', 5002))
+    )
+    registry.register_service(
+        'bookings',
+        os.getenv('BOOKINGS_SERVICE_HOST', 'localhost'),
+        int(os.getenv('BOOKINGS_SERVICE_PORT', 5003))
     )
 
     # Run the API Gateway
