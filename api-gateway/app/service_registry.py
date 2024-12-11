@@ -1,7 +1,6 @@
 import os
 import etcd3
 import json
-import time
 import logging
 from typing import Dict, Any
 
@@ -19,7 +18,8 @@ class ServiceRegistry:
 
         try:
             self.client = etcd3.client(host=self.etcd_host, port=self.etcd_port)
-            logging.basicConfig(level=logging.INFO)
+            logging.basicConfig(level=logging.INFO,
+                                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             self.logger = logging.getLogger(__name__)
             self.logger.info(f"Connected to etcd at {self.etcd_host}:{self.etcd_port}")
         except Exception as e:
@@ -44,11 +44,12 @@ class ServiceRegistry:
             "last_heartbeat": time.time()
         }
 
-        # Store service information with a lease for automatic expiration
-        lease = self.client.lease(60)  # 60-second TTL
-        self.client.put(service_key, json.dumps(service_info), lease=lease)
-
-        self.logger.info(f"Registered service: {service_name} at {host}:{port}")
+        try:
+            self.client.put(service_key, json.dumps(service_info))
+            self.logger.info(f"Registered service: {service_name} at {host}:{port}")
+        except Exception as e:
+            self.logger.error(f"Failed to register service {service_name}: {e}")
+            raise
 
     def discover_service(self, service_name: str) -> Dict[str, Any]:
         """
@@ -58,15 +59,20 @@ class ServiceRegistry:
         :return: Dictionary of available service instances
         """
         services = {}
-        for result in self.client.get_prefix(f"/services/{service_name}"):
-            key = result[1].key.decode('utf-8')
-            value = json.loads(result[0].decode('utf-8'))
-            services[key] = value
 
-        if not services:
-            self.logger.warning(f"No instances found for service: {service_name}")
+        try:
+            for result in self.client.get_prefix(f"/services/{service_name}"):
+                key = result[1].key.decode('utf-8')
+                value = json.loads(result[0].decode('utf-8'))
+                services[key] = value
 
-        return services
+            if not services:
+                self.logger.warning(f"No instances found for service: {service_name}")
+
+            return services
+        except Exception as e:
+            self.logger.error(f"Failed to discover service {service_name}: {e}")
+            raise
 
     def deregister_service(self, service_name: str, host: str, port: int):
         """
@@ -77,5 +83,42 @@ class ServiceRegistry:
         :param port: Service port
         """
         service_key = f"/services/{service_name}/{host}:{port}"
-        self.client.delete(service_key)
-        self.logger.info(f"Deregistered service: {service_name} at {host}:{port}")
+
+        try:
+            self.client.delete(service_key)
+            self.logger.info(f"Deregistered service: {service_name} at {host}:{port}")
+        except Exception as e:
+            self.logger.error(f"Failed to deregister service {service_name}: {e}")
+            raise
+
+    def list_all_services(self) -> Dict[str, Any]:
+        """
+        List all registered services in the registry
+
+        :return: Dictionary of all services and their instances
+        """
+        services = {}
+
+        try:
+            for result in self.client.get_prefix("/services/"):
+                key = result[1].key.decode('utf-8')
+                value = json.loads(result[0].decode('utf-8'))
+                services[key] = value
+
+            return services
+        except Exception as e:
+            self.logger.error("Failed to list all services: {e}")
+            raise
+
+    def shutdown(self):
+        """
+        Gracefully shut down the service registry client
+        """
+        try:
+            self.client.close()
+            self.logger.info("Service registry client shut down")
+        except Exception as e:
+            self.logger.error(f"Failed to shut down the service registry client: {e}")
+            raise
+
+
